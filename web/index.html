@@ -7,7 +7,7 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <meta
       name="description"
-      content="StatLab studio: drop a CSV, paste numbers, inspect every numeric channel, and read the bench — histogram, KDE, box, Q-Q, ECDF, ACF, scatter — all in the browser."
+      content="StatLab studio: drop a CSV, paste numbers, inspect every numeric channel, and read the bench — histogram with a normal overlay, KDE, box, Q-Q, ECDF, ACF, scatter, residuals, bootstrap means — all in the browser."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,14 +22,15 @@
     <header class="mast">
       <div>
         <p class="desk-meta" style="text-align: left; margin: 0 0 0.4rem">
-          <strong>STATLAB 2.1</strong> laboratory desk
+          <strong>STATLAB 2.2</strong> laboratory desk
         </p>
         <h1 class="wordmark">Stat<span>Lab</span></h1>
         <p class="lede">
           A local statistics instrument. Drop a CSV on the blotter, paste a
           column of numbers, click a channel, and watch the traces —
-          histogram, density, box, Q–Q, ECDF, ACF, and a two-channel scatter
-          with the OLS line. Nothing leaves the browser.
+          histogram (with a normal overlay), density, box, Q–Q, ECDF, ACF,
+          residuals, bootstrap means, and a two-channel scatter with the OLS
+          line. Hover a plot to read coordinates. Nothing leaves the browser.
         </p>
       </div>
       <div class="mast-side">
@@ -89,6 +90,15 @@
             <button type="button" class="ghost" id="export-html">
               Printable snapshot
             </button>
+            <button type="button" class="ghost" id="copy-md">
+              Copy markdown
+            </button>
+            <button type="button" class="toggle ghost" id="drop-outliers" aria-pressed="false">
+              Drop outliers
+            </button>
+            <button type="button" class="toggle ghost" id="log10" aria-pressed="false">
+              Log10
+            </button>
           </div>
           <p class="status" id="status" role="status"></p>
         </section>
@@ -130,11 +140,11 @@
 
       <section class="charts" aria-label="Plots">
         <figure class="plate" tabindex="0">
-          <figcaption><span>Histogram</span><span>counts</span></figcaption>
+          <figcaption><span>Histogram</span><span class="readout" data-default="counts · N(μ,s)">counts · N(μ,s)</span></figcaption>
           <canvas id="chart-hist" data-height="220" aria-label="Histogram of the primary channel"></canvas>
         </figure>
         <figure class="plate" tabindex="0">
-          <figcaption><span>KDE</span><span>Scott bandwidth</span></figcaption>
+          <figcaption><span>KDE</span><span class="readout" data-default="Scott bandwidth">Scott bandwidth</span></figcaption>
           <canvas id="chart-kde" data-height="220" aria-label="Kernel density estimate"></canvas>
         </figure>
         <figure class="plate" tabindex="0">
@@ -146,7 +156,7 @@
           <canvas id="chart-qq" data-height="180" aria-label="Normal quantile-quantile plot"></canvas>
         </figure>
         <figure class="plate" tabindex="0">
-          <figcaption><span>ECDF</span><span>Fₙ(x)</span></figcaption>
+          <figcaption><span>ECDF</span><span class="readout" data-default="Fₙ(x)">Fₙ(x)</span></figcaption>
           <canvas id="chart-ecdf" data-height="220" aria-label="Empirical cumulative distribution"></canvas>
         </figure>
         <figure class="plate" tabindex="0">
@@ -154,8 +164,16 @@
           <canvas id="chart-acf" data-height="220" aria-label="Autocorrelation stem plot"></canvas>
         </figure>
         <figure class="plate wide" tabindex="0">
-          <figcaption><span>Scatter + OLS</span><span>joint field</span></figcaption>
+          <figcaption><span>Scatter + OLS</span><span class="readout" data-default="joint field">joint field</span></figcaption>
           <canvas id="chart-scatter" data-height="280" aria-label="Scatter plot with ordinary least squares line"></canvas>
+        </figure>
+        <figure class="plate wide" tabindex="0">
+          <figcaption><span>Residuals</span><span class="readout" data-default="y − ŷ vs x">y − ŷ vs x</span></figcaption>
+          <canvas id="chart-residual" data-height="220" aria-label="Residual plot of y minus fitted values versus x"></canvas>
+        </figure>
+        <figure class="plate wide" tabindex="0">
+          <figcaption><span>Bootstrap means</span><span class="readout" data-default="800 · seed 1">800 · seed 1</span></figcaption>
+          <canvas id="chart-boot" data-height="220" aria-label="Histogram of 800 bootstrap means"></canvas>
         </figure>
       </section>
 
@@ -163,7 +181,7 @@
     </main>
 
     <footer>
-      StatLab 2.1 — C17 engine, C++17 CLI, and this desk. MIT licensed.
+      StatLab 2.2 — C17 engine, C++17 CLI, and this desk. MIT licensed.
       Serve with <code>python3 -m http.server</code> from <code>web/</code>.
     </footer>
     <script type="module" src="./studio.js"></script>

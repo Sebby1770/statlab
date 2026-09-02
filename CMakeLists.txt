@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
   statlab
-  VERSION 2.1.0
+  VERSION 2.2.0
   DESCRIPTION "StatLab: a C17 statistics engine with a C++17 CLI and web studio"
   LANGUAGES C CXX
 )
@@ -135,5 +135,10 @@ set_tests_properties(cli_bootstrap PROPERTIES PASS_REGULAR_EXPRESSION "bootstrap
 set_tests_properties(cli_qq PROPERTIES PASS_REGULAR_EXPRESSION "sample_q,theo_q")
 set_tests_properties(cli_kde PROPERTIES PASS_REGULAR_EXPRESSION "x,density")
 set_tests_properties(cli_mwu PROPERTIES PASS_REGULAR_EXPRESSION "mann_whitney_u")
+
+add_test(NAME cli_ks COMMAND statlab --column 1 --column2 2 --ks --skip-header --format csv --file ${PROJECT_SOURCE_DIR}/examples/paired.csv)
+add_test(NAME cli_paired COMMAND statlab --column 1 --column2 2 --paired --skip-header --format csv --file ${PROJECT_SOURCE_DIR}/examples/paired.csv)
+set_tests_properties(cli_ks PROPERTIES PASS_REGULAR_EXPRESSION "ks_d,0.6000")
+set_tests_properties(cli_paired PROPERTIES PASS_REGULAR_EXPRESSION "paired_t,-4.2426")
 
 install(TARGETS statlab stats_core)

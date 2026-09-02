@@ -906,6 +906,67 @@ int main() {
     CHECK(stats_normal_qq(data, 0, sample_q, theo_q) == STATS_ERR_EMPTY);
   }
 
+  /* ---------- v2.2: two-sample KS (ECDF with ≤ on pooled t) ---------- */
+  {
+    const double left[] = {1.0, 2.0, 3.0};
+    const double right[] = {4.0, 5.0, 6.0};
+    double d = 0.0;
+    CHECK(stats_ks_2samp(left, 3, right, 3, &d) == STATS_OK);
+    CHECK(close_to(d, 1.0));
+
+    const double px[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    const double py[] = {2.0, 4.0, 6.0, 8.0, 10.0};
+    CHECK(stats_ks_2samp(px, 5, py, 5, &d) == STATS_OK);
+    CHECK(close_to(d, 0.6));
+
+    CHECK(stats_ks_2samp(left, 3, left, 3, &d) == STATS_OK);
+    CHECK(close_to(d, 0.0));
+
+    const double one_a[] = {1.0};
+    const double one_b[] = {2.0};
+    CHECK(stats_ks_2samp(one_a, 1, one_b, 1, &d) == STATS_OK);
+    CHECK(close_to(d, 1.0));
+
+    CHECK(stats_ks_2samp(nullptr, 3, right, 3, &d) == STATS_ERR_NULL);
+    CHECK(stats_ks_2samp(left, 3, right, 3, nullptr) == STATS_ERR_NULL);
+    CHECK(stats_ks_2samp(left, 0, right, 3, &d) == STATS_ERR_EMPTY);
+  }
+
+  /* ---------- v2.2: paired t-test ---------- */
+  {
+    const double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    const double y[] = {2.0, 4.0, 6.0, 8.0, 10.0};
+    double t = 0.0;
+    double df = 0.0;
+    CHECK(stats_ttest_rel(x, y, 5, &t, &df) == STATS_OK);
+    CHECK(close_to(t, -4.2426406871, 0.000001));
+    CHECK(close_to(df, 4.0));
+
+    CHECK(stats_ttest_rel(x, x, 5, &t, &df) == STATS_OK);
+    CHECK(close_to(t, 0.0));
+    CHECK(close_to(df, 4.0));
+
+    const double a[] = {1.0, 2.0};
+    const double b[] = {0.0, 0.0};
+    CHECK(stats_ttest_rel(a, b, 2, &t, &df) == STATS_OK);
+    CHECK(close_to(t, 3.0));
+    CHECK(close_to(df, 1.0));
+
+    CHECK(stats_ttest_rel(nullptr, y, 5, &t, &df) == STATS_ERR_NULL);
+    CHECK(stats_ttest_rel(x, y, 5, nullptr, nullptr) == STATS_ERR_NULL);
+    CHECK(stats_ttest_rel(x, y, 0, &t, &df) == STATS_ERR_EMPTY);
+    CHECK(stats_ttest_rel(x, y, 1, &t, &df) == STATS_ERR_INVALID);
+  }
+
+  /* ---------- v2.2: normal pdf ---------- */
+  {
+    CHECK(close_to(stats_normal_pdf(0.0, 0.0, 1.0), 0.3989422804, 0.0000001));
+    CHECK(close_to(stats_normal_pdf(1.0, 0.0, 1.0), 0.2419707245, 0.0000001));
+    CHECK(close_to(stats_normal_pdf(5.0, 5.0, 2.0), 0.1994711402, 0.0000001));
+    CHECK(close_to(stats_normal_pdf(0.0, 0.0, 0.0), 0.0));
+    CHECK(close_to(stats_normal_pdf(1.0, 0.0, -2.0), 0.0));
+  }
+
   if (failures != 0) {
     std::cerr << failures << " check(s) failed\n";
     return 1;

@@ -385,6 +385,25 @@ figcaption {
   margin-bottom: 0.65rem;
 }
 
+figcaption .readout {
+  color: var(--phosphor);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  min-height: 1em;
+}
+
+button.toggle[aria-pressed="true"] {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--paper);
+}
+
+html[data-theme="day"] button.toggle[aria-pressed="true"] {
+  background: var(--teal);
+  color: #f3eee4;
+}
+
 canvas {
   display: block;
   width: 100%;

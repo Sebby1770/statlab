@@ -1,7 +1,7 @@
 # StatLab
 
 StatLab is a compact statistics workshop: a **C17** engine, a **C++17** CLI
-named `statlab`, and a zero-backend **web studio**. Version **2.1.0**.
+named `statlab`, and a zero-backend **web studio**. Version **2.2.0**.
 
 Studio: [https://sebby1770.github.io/statlab/](https://sebby1770.github.io/statlab/)
 
@@ -15,7 +15,7 @@ docs, and desktop-in-the-browser are StatLab.
 - Descriptive statistics (mean through Tukey fences, moments, geometric /
   harmonic means, Student-*t* CI, Jarque–Bera, …)
 - Bivariate analysis: Pearson, Spearman, covariance, OLS, two-sample *t*,
-  Mann–Whitney U
+  paired *t*, two-sample KS, Mann–Whitney U
 - Series helpers: moving average, EMA, ACF / ACF series, ECDF, ranks, diffs,
   robust z-scores
 - Bootstrap percentile CI for the mean (deterministic xorshift64)
@@ -23,7 +23,8 @@ docs, and desktop-in-the-browser are StatLab.
 - ASCII histogram / boxplot, plus SVG in the HTML report
 - Multi-column CSV (`--column`, `--column2`, `--skip-header`)
 - Web studio: drop a CSV, paste numbers, column overview, outlier list,
-  histogram overlay, ECDF / ACF charts, daylight desk
+  histogram (normal overlay + hover readout), ECDF / ACF / residuals /
+  bootstrap-mean charts, log10 and drop-outliers working copy, daylight desk
 - CMake + CTest, Node tests for the JS port, GitHub Actions on Ubuntu
 
 ## Build
@@ -49,10 +50,12 @@ cmake --build build
 ./build/statlab --format html --file examples/sample.csv
 ./build/statlab --ecdf 4.5 1 2 3 4 5 6 7 8 9
 ./build/statlab --acf --format csv 1 2 3 4 5 6
+./build/statlab --column 1 --column2 2 --ks --skip-header --file examples/paired.csv
+./build/statlab --column 1 --column2 2 --paired --skip-header --file examples/paired.csv
 printf "1,2,3,4,5" | ./build/statlab --format csv
 ```
 
-`--version` prints `statlab 2.1.0`. `-h` / `--help` lists every flag.
+`--version` prints `statlab 2.2.0`. `-h` / `--help` lists every flag.
 Existing flags from Hybrid Stats Lab still work; they now live on the
 `statlab` binary.
 
@@ -74,6 +77,8 @@ the same document to stdout.
 | `--mwu [file]` | Mann–Whitney U vs a second file, or two columns via `--column2` |
 | `--ecdf <x>` | Empirical CDF F(x) = (count of values ≤ x) / n |
 | `--acf [lag]` | Autocorrelation at lag; omit lag to print lags 0..min(20, n−1) |
+| `--ks [file]` | Two-sample KS D vs a second file, or two columns via `--column2` |
+| `--paired` | Paired *t*-test on two columns (`--column` / `--column2`) |
 
 ## Web studio
 
@@ -86,15 +91,19 @@ python3 -m http.server
 
 Open [http://localhost:8000](http://localhost:8000). Drop a CSV on the
 blotter or paste numbers; the desk detects numeric columns, lists Tukey
-outliers, and draws histogram (two-channel overlay), KDE, box, Q–Q, ECDF,
-ACF, and scatter on `<canvas>` with no chart library. Daylight toggle and
-the last CSV stick in `localStorage`. Keys: **S** sample, **E** export,
-**D** daylight. Export JSON or a printable HTML snapshot. `web/404.html`
-is a GitHub Pages 404.
+outliers, and draws histogram (two-channel overlay plus N(mean, s) curve),
+KDE, box, Q–Q, ECDF, ACF, residuals, bootstrap means, and scatter on
+`<canvas>` with no chart library. Hover a histogram, KDE, ECDF, or scatter
+to read coordinates. Drop outliers rebuilds a working copy of the primary
+series (original parse is untouched); Log10 skips non-positive values;
+Copy markdown dumps the metric cards. Daylight toggle and the last CSV
+stick in `localStorage`. Keys: **S** sample, **E** export, **D** daylight.
+Export JSON or a printable HTML snapshot. `web/404.html` is a GitHub Pages
+404.
 
 `web/stats.js` is an ES module port of the core (descriptive, bivariate,
-bootstrap, Mann–Whitney, KDE, Q–Q, ECDF, ACF) used by the studio and by
-`node --test`.
+bootstrap, Mann–Whitney, KDE, Q–Q, ECDF, ACF, KS, paired *t*, normal pdf)
+used by the studio and by `node --test`.
 
 ## C API highlights
 
@@ -127,6 +136,14 @@ stats_ecdf(values, n, 4.5, &F);          /* (# <= 4.5) / n */
 
 double acf[21];
 stats_acf_series(values, n, 20, acf);    /* lags 0..20; requires 20 < n */
+
+double D;
+stats_ks_2samp(x, nx, y, ny, &D);        /* max |F_x − F_y| on pooled t */
+
+double t_rel, df_rel;
+stats_ttest_rel(x, y, n, &t_rel, &df_rel); /* paired; df = n-1 */
+
+double dens = stats_normal_pdf(0.0, 0.0, 1.0); /* 0 if sd <= 0 */
 ```
 
 NaN / error cases follow the existing `StatsStatus` contract and are
@@ -144,7 +161,8 @@ npm test
 `tests/reference_values_tests.cpp` asserts published definitions (not the
 library’s own previous output). The Node tests check that `web/stats.js`
 matches those C goldens for mean, median, stddev, Pearson, OLS,
-Mann–Whitney, ECDF, and ACF on the shared fixture.
+Mann–Whitney, ECDF, ACF, two-sample KS, paired *t*, and the normal pdf
+on the shared fixture.
 
 ## Layout
 

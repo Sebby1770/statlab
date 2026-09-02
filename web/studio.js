@@ -1,12 +1,14 @@
 import {
   acfSeries,
   bootstrapMeanCi,
+  bootstrapMeans,
   histogram,
   kde,
   linreg,
   linspace,
   mannwhitney,
   meanCi,
+  normalPdf,
   normalQQ,
   numericColumn,
   parseCsv,
@@ -42,6 +44,9 @@ const els = {
   compare: document.getElementById("compare"),
   exportJson: document.getElementById("export-json"),
   exportHtml: document.getElementById("export-html"),
+  copyMd: document.getElementById("copy-md"),
+  dropOutliers: document.getElementById("drop-outliers"),
+  log10: document.getElementById("log10"),
   theme: document.getElementById("theme-toggle"),
   hist: document.getElementById("chart-hist"),
   kde: document.getElementById("chart-kde"),
@@ -50,6 +55,8 @@ const els = {
   ecdf: document.getElementById("chart-ecdf"),
   acf: document.getElementById("chart-acf"),
   scatter: document.getElementById("chart-scatter"),
+  residual: document.getElementById("chart-residual"),
+  boot: document.getElementById("chart-boot"),
 };
 
 const state = {
@@ -57,8 +64,12 @@ const state = {
   sourceName: "bench sample",
   x: [],
   y: [],
+  xRaw: [],
+  yRaw: [],
   xName: "",
   yName: "",
+  dropOutliers: false,
+  log10: false,
 };
 
 function isDay() {
@@ -297,6 +308,44 @@ function mapY(v, lo, hi, y0, y1) {
   return y1 - ((v - lo) / (hi - lo)) * (y1 - y0);
 }
 
+function setHover(canvas, spec) {
+  canvas._hover = spec;
+}
+
+function bindPlotHover(canvas) {
+  const cap = canvas && canvas.closest("figure")?.querySelector(".readout");
+  if (!canvas || !cap) {
+    return;
+  }
+  const restore = () => {
+    cap.textContent = cap.dataset.default || "";
+  };
+  canvas.addEventListener("mousemove", (event) => {
+    const info = canvas._hover;
+    if (!info || info.x1 === info.x0) {
+      restore();
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
+    if (px < info.x0 || px > info.x1 || py < info.y0 || py > info.y1) {
+      restore();
+      return;
+    }
+    const xv =
+      info.xLo + ((px - info.x0) / (info.x1 - info.x0)) * (info.xHi - info.xLo);
+    if (info.xy && info.y1 !== info.y0) {
+      const yv =
+        info.yLo + ((info.y1 - py) / (info.y1 - info.y0)) * (info.yHi - info.yLo);
+      cap.textContent = `x ${fmt(xv, 3)}  y ${fmt(yv, 3)}`;
+    } else {
+      cap.textContent = `x ${fmt(xv, 3)}`;
+    }
+  });
+  canvas.addEventListener("mouseleave", restore);
+}
+
 function histCounts(values, bins, min, max) {
   const counts = new Array(bins).fill(0);
   if (values.length === 0) {
@@ -316,7 +365,10 @@ function histCounts(values, bins, min, max) {
   return counts;
 }
 
-function drawHistogram(canvas, values, valuesB) {
+function drawHistogram(canvas, values, valuesB, options = {}) {
+  if (!canvas || !values || values.length === 0) {
+    return;
+  }
   const pal = palette();
   const { ctx, width, height } = sizeCanvas(canvas);
   clearPlot(ctx, width, height, pal);
@@ -345,7 +397,15 @@ function drawHistogram(canvas, values, valuesB) {
   const x1 = width - 16;
   const y1 = height - 32;
   axes(ctx, pal, x0, y0, x1, y1);
-  const maxC = Math.max(1, ...countsA, ...(countsB || [0]));
+  const binWidth = countsA.length && max > min ? (max - min) / countsA.length : 1;
+  const s = summary(values);
+  let maxC = Math.max(1, ...countsA, ...(countsB || [0]));
+  if (options.normal && s.sampleStddev > 0 && max > min) {
+    const peak = normalPdf(s.mean, s.mean, s.sampleStddev) * values.length * binWidth;
+    if (peak > maxC) {
+      maxC = peak;
+    }
+  }
   const bw = (x1 - x0) / countsA.length;
   countsA.forEach((c, i) => {
     const h = (c / maxC) * (y1 - y0);
@@ -370,10 +430,25 @@ function drawHistogram(canvas, values, valuesB) {
     ctx.font = "11px 'IBM Plex Mono', monospace";
     ctx.fillText(`${state.xName} · ${state.yName}`, x0, 18);
   }
+  if (options.normal && s.sampleStddev > 0 && max > min) {
+    const xs = linspace(min, max, 160);
+    ctx.beginPath();
+    xs.forEach((x, i) => {
+      const y = normalPdf(x, s.mean, s.sampleStddev) * values.length * binWidth;
+      const px = mapX(x, min, max, x0, x1);
+      const py = mapY(y, 0, maxC, y0, y1);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.strokeStyle = pal.copper;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   ctx.fillStyle = pal.paper;
   ctx.font = "11px 'IBM Plex Mono', monospace";
   ctx.fillText(fmt(min, 2), x0, height - 12);
   ctx.fillText(fmt(max, 2), x1 - 48, height - 12);
+  setHover(canvas, { x0, y0, x1, y1, xLo: min, xHi: max });
 }
 
 function drawKDE(canvas, values) {
@@ -408,6 +483,14 @@ function drawKDE(canvas, values) {
   ctx.closePath();
   ctx.fillStyle = pal.phosphorFill;
   ctx.fill();
+  setHover(canvas, {
+    x0,
+    y0,
+    x1,
+    y1,
+    xLo: xs[0],
+    xHi: xs[xs.length - 1],
+  });
 }
 
 function drawBox(canvas, values) {
@@ -529,6 +612,7 @@ function drawEcdf(canvas, values) {
   ctx.font = "11px 'IBM Plex Mono', monospace";
   ctx.fillText("0", x0 - 18, y1);
   ctx.fillText("1", x0 - 18, y0 + 10);
+  setHover(canvas, { x0, y0, x1, y1, xLo, xHi });
 }
 
 function drawAcf(canvas, values) {
@@ -590,6 +674,7 @@ function drawScatter(canvas, x, y) {
     ctx.fillStyle = pal.paper;
     ctx.font = "13px 'IBM Plex Sans', sans-serif";
     ctx.fillText("Pick a second channel to plot the joint field.", 48, height / 2);
+    setHover(canvas, null);
     return;
   }
   const xs = x.slice(0, n);
@@ -633,6 +718,81 @@ function drawScatter(canvas, x, y) {
     x0 + 8,
     18,
   );
+  setHover(canvas, {
+    x0,
+    y0,
+    x1,
+    y1,
+    xLo: xmin,
+    xHi: xmax,
+    yLo: ymin,
+    yHi: ymax,
+    xy: true,
+  });
+}
+
+function drawResidual(canvas, x, y) {
+  const pal = palette();
+  const { ctx, width, height } = sizeCanvas(canvas);
+  clearPlot(ctx, width, height, pal);
+  const n = Math.min(x.length, y.length);
+  if (n < 2) {
+    ctx.fillStyle = pal.paper;
+    ctx.font = "13px 'IBM Plex Sans', sans-serif";
+    ctx.fillText("Pick a second channel to plot residuals.", 48, height / 2);
+    setHover(canvas, null);
+    return;
+  }
+  const xs = x.slice(0, n);
+  const ys = y.slice(0, n);
+  const fit = linreg(xs, ys);
+  const resid = xs.map((v, i) => ys[i] - (fit.slope * v + fit.intercept));
+  const xmin = Math.min(...xs);
+  const xmax = Math.max(...xs);
+  let rmin = Math.min(0, ...resid);
+  let rmax = Math.max(0, ...resid);
+  if (rmax <= rmin) {
+    rmax = rmin + 1;
+  }
+  const x0 = 48;
+  const y0 = 16;
+  const x1 = width - 16;
+  const y1 = height - 32;
+  axes(ctx, pal, x0, y0, x1, y1);
+  const zero = mapY(0, rmin, rmax, y0, y1);
+  ctx.strokeStyle = pal.copper;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x0, zero);
+  ctx.lineTo(x1, zero);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = pal.phosphor;
+  for (let i = 0; i < n; i++) {
+    ctx.beginPath();
+    ctx.arc(
+      mapX(xs[i], xmin, xmax, x0, x1),
+      mapY(resid[i], rmin, rmax, y0, y1),
+      3.1,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.fillStyle = pal.paper;
+  ctx.font = "11px 'IBM Plex Mono', monospace";
+  ctx.fillText("0", x0 - 18, zero + 4);
+  setHover(canvas, {
+    x0,
+    y0,
+    x1,
+    y1,
+    xLo: xmin,
+    xHi: xmax,
+    yLo: rmin,
+    yHi: rmax,
+    xy: true,
+  });
 }
 
 function renderCompare(x, y, xName, yName) {
@@ -668,6 +828,38 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
+function syncToggleButtons() {
+  if (els.dropOutliers) {
+    els.dropOutliers.setAttribute("aria-pressed", state.dropOutliers ? "true" : "false");
+    els.dropOutliers.textContent = state.dropOutliers ? "Restore outliers" : "Drop outliers";
+  }
+  if (els.log10) {
+    els.log10.setAttribute("aria-pressed", state.log10 ? "true" : "false");
+  }
+}
+
+function rebuildWorking() {
+  let xs = state.xRaw.slice();
+  let ys = state.yRaw.slice();
+  if (state.dropOutliers && xs.length) {
+    const s = summary(xs);
+    const keep = xs.map((v) => v >= s.fenceLow && v <= s.fenceHigh);
+    if (ys.length === xs.length) {
+      ys = ys.filter((_, i) => keep[i]);
+    }
+    xs = xs.filter((_, i) => keep[i]);
+  }
+  if (state.log10) {
+    const keep = xs.map((v) => v > 0);
+    if (ys.length === xs.length) {
+      ys = ys.filter((_, i) => keep[i]);
+    }
+    xs = xs.filter((_, i) => keep[i]).map((v) => Math.log10(v));
+  }
+  state.x = xs;
+  state.y = ys;
+}
+
 function currentPair() {
   if (!state.parsed) return;
   const names = state.parsed.numericColumns;
@@ -675,8 +867,9 @@ function currentPair() {
   const b = els.colB.value;
   state.xName = a;
   state.yName = b;
-  state.x = numericColumn(state.parsed.columns, a);
-  state.y = b ? numericColumn(state.parsed.columns, b) : [];
+  state.xRaw = numericColumn(state.parsed.columns, a);
+  state.yRaw = b ? numericColumn(state.parsed.columns, b) : [];
+  rebuildWorking();
 }
 
 function render() {
@@ -691,23 +884,28 @@ function render() {
   renderMetrics(s, ci, boot);
   renderColumns();
   renderOutliers(state.x, s);
-  drawHistogram(els.hist, state.x, state.y);
+  drawHistogram(els.hist, state.x, state.y, { normal: true });
   drawKDE(els.kde, state.x);
   drawBox(els.box, state.x);
   drawQQ(els.qq, state.x);
   drawEcdf(els.ecdf, state.x);
   drawAcf(els.acf, state.x);
   drawScatter(els.scatter, state.x, state.y);
+  drawResidual(els.residual, state.x, state.y);
+  drawHistogram(els.boot, bootstrapMeans(state.x, 800, 1n));
   renderCompare(state.x, state.y, state.xName, state.yName);
-  setStatus(
-    `${state.sourceName} · ${state.x.length} readings on ${state.xName}` +
-      (state.yName ? ` vs ${state.yName}` : ""),
-  );
+  const bits = [`${state.sourceName} · ${state.x.length} readings on ${state.xName}`];
+  if (state.yName) bits.push(`vs ${state.yName}`);
+  if (state.dropOutliers) bits.push("outliers dropped");
+  if (state.log10) bits.push("log10");
+  setStatus(bits.join(" · "));
 }
 
 function loadParsed(parsed, name, rawText) {
   state.parsed = parsed;
   state.sourceName = name;
+  state.dropOutliers = false;
+  syncToggleButtons();
   els.fileName.textContent = name;
   if (rawText) {
     rememberCsv(rawText, name);
@@ -792,7 +990,8 @@ function exportJson() {
 function exportHtml() {
   if (state.x.length === 0) return;
   const s = summary(state.x);
-  const images = [els.hist, els.kde, els.box, els.qq, els.ecdf, els.acf, els.scatter]
+  const images = [els.hist, els.kde, els.box, els.qq, els.ecdf, els.acf, els.scatter, els.residual, els.boot]
+    .filter(Boolean)
     .map((c) => `<img alt="" src="${c.toDataURL("image/png")}">`)
     .join("");
   const bg = isDay() ? PAPER : INK;
@@ -829,6 +1028,47 @@ function downloadBlob(blob, name) {
   URL.revokeObjectURL(a.href);
 }
 
+function copyMarkdown() {
+  const cards = els.metrics.querySelectorAll(".metric");
+  if (!cards.length) {
+    setStatus("Nothing to copy.");
+    return;
+  }
+  const rows = ["| metric | value |", "| --- | --- |"];
+  cards.forEach((card) => {
+    const dt = card.querySelector("dt")?.textContent.trim() ?? "";
+    const dd = card.querySelector("dd")?.textContent.trim() ?? "";
+    rows.push(`| ${dt} | ${dd} |`);
+  });
+  const md = rows.join("\n");
+  const done = () => setStatus("Copied markdown metrics.");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(md).then(done).catch(() => {
+      fallbackCopy(md);
+      done();
+    });
+  } else {
+    fallbackCopy(md);
+    done();
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand("copy");
+  } catch {
+    /* ignore */
+  }
+  document.body.removeChild(ta);
+}
+
 els.sample.addEventListener("click", () => {
   loadSample().catch((err) => setStatus(err.message));
 });
@@ -848,11 +1088,33 @@ els.paste.addEventListener("keydown", (event) => {
     ingestText(els.paste.value, "pasted numbers");
   }
 });
-els.colA.addEventListener("change", render);
+els.colA.addEventListener("change", () => {
+  state.dropOutliers = false;
+  syncToggleButtons();
+  render();
+});
 els.colB.addEventListener("change", render);
 els.exportJson.addEventListener("click", exportJson);
 els.exportHtml.addEventListener("click", exportHtml);
+if (els.copyMd) {
+  els.copyMd.addEventListener("click", copyMarkdown);
+}
+if (els.dropOutliers) {
+  els.dropOutliers.addEventListener("click", () => {
+    state.dropOutliers = !state.dropOutliers;
+    syncToggleButtons();
+    render();
+  });
+}
+if (els.log10) {
+  els.log10.addEventListener("click", () => {
+    state.log10 = !state.log10;
+    syncToggleButtons();
+    render();
+  });
+}
 els.theme.addEventListener("click", toggleTheme);
+[els.hist, els.kde, els.ecdf, els.scatter, els.residual, els.boot].forEach(bindPlotHover);
 window.addEventListener("resize", () => {
   if (state.x.length) {
     render();

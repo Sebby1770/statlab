@@ -245,6 +245,64 @@ int main() {
         expect_near("qq_theo_last", theo_q[7], 1.4342001597, 1e-9);
     }
 
+    /* --- Two-sample KS: max_t |F_x(t)−F_y(t)|, F(t)=#{v≤t}/n ---------- */
+    {
+        /* Completely separated samples: the ECDFs differ by 1 at every
+           point of the first sample. */
+        const double left[] = {1.0, 2.0, 3.0};
+        const double right[] = {4.0, 5.0, 6.0};
+        stats_ks_2samp(left, 3, right, 3, &a);
+        expect_near("ks_separated", a, 1.0, 1e-12);
+
+        /* paired.csv columns: x={1,2,3,4,5}, y={2,4,6,8,10}.
+           At t=5, F_x=1 and F_y=2/5, so D = 0.6. */
+        const double px[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+        const double py[] = {2.0, 4.0, 6.0, 8.0, 10.0};
+        stats_ks_2samp(px, 5, py, 5, &a);
+        expect_near("ks_paired_csv", a, 0.6, 1e-12);
+
+        /* Identical samples → D = 0. Ties must not inflate D. */
+        stats_ks_2samp(kX, kN, kX, kN, &a);
+        expect_near("ks_identical", a, 0.0, 1e-12);
+
+        /* kX vs kY: the ECDFs never differ by more than 1/10. */
+        stats_ks_2samp(kX, kN, kY, kN, &a);
+        expect_near("ks_kX_kY", a, 0.1, 1e-12);
+    }
+
+    /* --- Paired t-test: d_i = x_i − y_i, t = mean(d)/(s_d/√n) ---------- */
+    {
+        double t = 0.0, df = 0.0;
+        /* kX − kY = {1,1,-1,1,-2,1,-3,2,-3,5}: mean 0.2, Σ(d-m)² = 55.6,
+           s_d = √(55.6/9), t = 6/√556, df = 9. */
+        stats_ttest_rel(kX, kY, kN, &t, &df);
+        expect_near("ttest_rel_t", t, 0.2544566789, 1e-9);
+        expect_near("ttest_rel_df", df, 9.0, 1e-12);
+
+        /* paired.csv: d = {-1,-2,-3,-4,-5}, mean −3, s_d = √2.5,
+           t = −3 √5 / √2.5 = −3√2, df = 4. */
+        const double px[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+        const double py[] = {2.0, 4.0, 6.0, 8.0, 10.0};
+        stats_ttest_rel(px, py, 5, &t, &df);
+        expect_near("ttest_rel_paired_csv", t, -4.2426406871, 1e-9);
+        expect_near("ttest_rel_paired_df", df, 4.0, 1e-12);
+
+        /* Equal series → t = 0. */
+        stats_ttest_rel(kX, kX, kN, &t, &df);
+        expect_near("ttest_rel_zero", t, 0.0, 1e-12);
+    }
+
+    /* --- Normal pdf: φ((x−μ)/σ)/σ; 0 when σ ≤ 0 ----------------------- */
+    expect_near("normal_pdf(0,0,1)", stats_normal_pdf(0.0, 0.0, 1.0),
+               0.3989422804, 1e-9);
+    expect_near("normal_pdf(1,0,1)", stats_normal_pdf(1.0, 0.0, 1.0),
+               0.2419707245, 1e-9);
+    /* Peak of N(μ, σ²) is 1/(σ √(2π)). */
+    expect_near("normal_pdf(5,5,2)", stats_normal_pdf(5.0, 5.0, 2.0),
+               0.1994711402, 1e-9);
+    expect_near("normal_pdf sd=0", stats_normal_pdf(0.0, 0.0, 0.0), 0.0, 1e-15);
+    expect_near("normal_pdf sd<0", stats_normal_pdf(1.0, 0.0, -1.0), 0.0, 1e-15);
+
     /* --- Bootstrap percentile CI, xorshift64 seed 1, nboot 20 ----------- */
     {
         /* Independent enumeration of Marsaglia xorshift64 (seed 1) over

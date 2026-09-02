@@ -1846,6 +1846,116 @@ StatsStatus stats_normal_qq(const double *values, size_t n, double *sample_q,
   return STATS_OK;
 }
 
+StatsStatus stats_ks_2samp(const double *x, size_t nx, const double *y,
+                           size_t ny, double *d) {
+  if (d == NULL || (x == NULL && nx > 0) || (y == NULL && ny > 0)) {
+    return STATS_ERR_NULL;
+  }
+  if (nx == 0 || ny == 0) {
+    return STATS_ERR_EMPTY;
+  }
+  if (nx > SIZE_MAX / sizeof(double) || ny > SIZE_MAX / sizeof(double)) {
+    return STATS_ERR_ALLOCATION;
+  }
+
+  double *xs = (double *)malloc(sizeof(double) * nx);
+  double *ys = (double *)malloc(sizeof(double) * ny);
+  if (xs == NULL || ys == NULL) {
+    free(xs);
+    free(ys);
+    return STATS_ERR_ALLOCATION;
+  }
+  memcpy(xs, x, sizeof(double) * nx);
+  memcpy(ys, y, sizeof(double) * ny);
+  qsort(xs, nx, sizeof(double), compare_double);
+  qsort(ys, ny, sizeof(double), compare_double);
+
+  /* Walk distinct pooled values t; F uses ≤ so both sides consume every
+     observation equal to t before the vertical distance is measured. */
+  size_t i = 0;
+  size_t j = 0;
+  double best = 0.0;
+  while (i < nx || j < ny) {
+    double t;
+    if (i < nx && (j >= ny || xs[i] <= ys[j])) {
+      t = xs[i];
+    } else {
+      t = ys[j];
+    }
+    while (i < nx && xs[i] <= t) {
+      ++i;
+    }
+    while (j < ny && ys[j] <= t) {
+      ++j;
+    }
+    const double diff =
+        fabs((double)i / (double)nx - (double)j / (double)ny);
+    if (diff > best) {
+      best = diff;
+    }
+  }
+
+  free(xs);
+  free(ys);
+  *d = best;
+  return STATS_OK;
+}
+
+StatsStatus stats_ttest_rel(const double *x, const double *y, size_t n,
+                            double *t_out, double *df_out) {
+  if ((x == NULL && n > 0) || (y == NULL && n > 0)) {
+    return STATS_ERR_NULL;
+  }
+  if (n == 0) {
+    return STATS_ERR_EMPTY;
+  }
+  if (n < 2) {
+    return STATS_ERR_INVALID;
+  }
+  if (t_out == NULL && df_out == NULL) {
+    return STATS_ERR_NULL;
+  }
+
+  double mean = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    mean += x[i] - y[i];
+  }
+  mean /= (double)n;
+
+  double m2 = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    const double d = (x[i] - y[i]) - mean;
+    m2 += d * d;
+  }
+  const double sd = sqrt(m2 / (double)(n - 1));
+  double t = 0.0;
+  if (sd <= 0.0) {
+    if (mean == 0.0) {
+      t = 0.0;
+    } else {
+      return STATS_ERR_INVALID;
+    }
+  } else {
+    t = mean / (sd / sqrt((double)n));
+  }
+
+  if (t_out != NULL) {
+    *t_out = t;
+  }
+  if (df_out != NULL) {
+    *df_out = (double)(n - 1);
+  }
+  return STATS_OK;
+}
+
+double stats_normal_pdf(double x, double mean, double sd) {
+  if (!(sd > 0.0)) {
+    return 0.0;
+  }
+  const double z = (x - mean) / sd;
+  return (kInvSqrt2Pi / sd) * exp(-0.5 * z * z);
+}
+
 double stats_sum(const double *values, size_t count) {
   if (values == NULL) {
     return 0.0;

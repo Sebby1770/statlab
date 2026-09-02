@@ -89,6 +89,11 @@ struct CliOptions {
   bool qq = false;
   bool kde = false;
   size_t kde_bins = 50;
+  /* v2.2 */
+  bool ks = false;
+  std::string ks_path;
+  bool has_ks_path = false;
+  bool paired = false;
 };
 
 void print_help() {
@@ -119,6 +124,9 @@ void print_help() {
       << "  statlab --bootstrap 2000 --seed 1 1 2 3 4 5\n"
       << "  statlab --qq --kde 40 1 2 3 4 5 6 7 8\n"
       << "  statlab --mwu other.csv --file data.csv\n"
+      << "  statlab --ks other.csv --file data.csv\n"
+      << "  statlab --column 1 --column2 2 --ks --file data.csv\n"
+      << "  statlab --column 1 --column2 2 --paired --file data.csv\n"
       << "  statlab --html report.html --file data.csv\n"
       << "  printf '1,2,3,4' | statlab --format csv\n\n"
       << "Options:\n"
@@ -172,6 +180,10 @@ void print_help() {
       << "      --qq                Sample vs theoretical normal quantiles\n"
       << "      --kde [bins]        Gaussian KDE on a linspace of the range "
          "(default: 50)\n"
+      << "      --ks [path]         Two-sample KS D vs second file, or two "
+         "columns via --column2\n"
+      << "      --paired            Paired t-test on two columns "
+         "(--column / --column2)\n"
       << "      --html <path>       Write a self-contained HTML report\n"
       << "      --version           Show the program version\n"
       << "  -h, --help              Show this help text\n";
@@ -830,6 +842,20 @@ CliOptions parse_args(int argc, char **argv) {
       continue;
     }
 
+    if (arg == "--ks") {
+      options.ks = true;
+      if (i + 1 < argc && !looks_like_option(argv[i + 1])) {
+        options.ks_path = argv[++i];
+        options.has_ks_path = true;
+      }
+      continue;
+    }
+
+    if (arg == "--paired") {
+      options.paired = true;
+      continue;
+    }
+
     if (looks_like_option(arg)) {
       throw std::runtime_error("Unknown option: " + arg);
     }
@@ -843,8 +869,8 @@ CliOptions parse_args(int argc, char **argv) {
   const bool need_two_cols =
       options.column2 > 0 &&
       (options.correlate || options.regression || options.spearman ||
-       options.cov || options.mwu || options.write_html ||
-       options.format == OutputFormat::Html);
+       options.cov || options.mwu || options.ks || options.paired ||
+       options.write_html || options.format == OutputFormat::Html);
 
   /* Load files after options are fully known (column / skip-header). */
   if (need_two_cols) {
@@ -888,6 +914,11 @@ CliOptions parse_args(int argc, char **argv) {
   if (options.has_mwu_path) {
     options.values_y =
         load_file(options.mwu_path, options.column, options.skip_header);
+  }
+
+  if (options.has_ks_path) {
+    options.values_y =
+        load_file(options.ks_path, options.column, options.skip_header);
   }
 
   if (!saw_input && !options.has_compare && options.values.empty()) {
@@ -2088,6 +2119,72 @@ size_t paired_n(const std::vector<double> &x, const std::vector<double> &y) {
   return x.size() < y.size() ? x.size() : y.size();
 }
 
+void print_ks(const std::vector<double> &x, const std::vector<double> &y,
+              int precision, OutputFormat format) {
+  double d = 0.0;
+  const StatsStatus st =
+      stats_ks_2samp(x.data(), x.size(), y.data(), y.size(), &d);
+  if (st != STATS_OK) {
+    throw std::runtime_error(std::string("KS two-sample failed: ") +
+                             stats_status_message(st));
+  }
+  if (format == OutputFormat::Json) {
+    std::cout << "{\n  \"n_x\": " << x.size() << ",\n  \"n_y\": " << y.size()
+              << ",\n  \"ks_d\": ";
+    print_json_number(std::cout, d, precision);
+    std::cout << "\n}\n";
+    return;
+  }
+  if (format == OutputFormat::Csv || format == OutputFormat::Html) {
+    std::cout << "metric,value\nn_x," << x.size() << "\nn_y," << y.size()
+              << "\nks_d,";
+    print_number(std::cout, d, precision);
+    std::cout << '\n';
+    return;
+  }
+  std::cout << "Two-sample Kolmogorov-Smirnov\n";
+  std::cout << "n_x:             " << x.size() << '\n';
+  std::cout << "n_y:             " << y.size() << '\n';
+  std::cout << "ks_d:            ";
+  print_number(std::cout, d, precision);
+  std::cout << '\n';
+}
+
+void print_paired(const std::vector<double> &x, const std::vector<double> &y,
+                  int precision, OutputFormat format) {
+  const size_t n = paired_n(x, y);
+  double t = 0.0;
+  double df = 0.0;
+  const StatsStatus st = stats_ttest_rel(x.data(), y.data(), n, &t, &df);
+  if (st != STATS_OK) {
+    throw std::runtime_error(std::string("Paired t-test failed: ") +
+                             stats_status_message(st));
+  }
+  if (format == OutputFormat::Json) {
+    std::cout << "{\n  \"n\": " << n << ",\n  \"paired_t\": ";
+    print_json_number(std::cout, t, precision);
+    std::cout << ",\n  \"paired_df\": ";
+    print_json_number(std::cout, df, precision);
+    std::cout << "\n}\n";
+    return;
+  }
+  if (format == OutputFormat::Csv || format == OutputFormat::Html) {
+    std::cout << "metric,value\nn," << n << "\npaired_t,";
+    print_number(std::cout, t, precision);
+    std::cout << "\npaired_df,";
+    print_number(std::cout, df, precision);
+    std::cout << '\n';
+    return;
+  }
+  std::cout << "Paired t-test\n";
+  std::cout << "n:               " << n << '\n';
+  std::cout << "paired_t:        ";
+  print_number(std::cout, t, precision);
+  std::cout << "\npaired_df:       ";
+  print_number(std::cout, df, precision);
+  std::cout << '\n';
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -2258,6 +2355,37 @@ int main(int argc, char **argv) {
       if (tables) {
         print_mwu(options.values, options.values_y, options.precision,
                   options.format);
+      }
+      specialized = true;
+    }
+
+    if (options.ks) {
+      if (options.values.empty() || options.values_y.empty()) {
+        throw std::runtime_error(
+            "Two series required for --ks: pass --ks <file>, or "
+            "--column N --column2 M with a multi-column file");
+      }
+      if (tables) {
+        print_ks(options.values, options.values_y, options.precision,
+                 options.format);
+      }
+      specialized = true;
+    }
+
+    if (options.paired) {
+      if (options.values.empty() || options.values_y.empty()) {
+        throw std::runtime_error(
+            "Two series required for --paired: use --column N --column2 M "
+            "with a multi-column file");
+      }
+      const size_t n = paired_n(options.values, options.values_y);
+      if (n < 2) {
+        throw std::runtime_error(
+            "Paired t-test requires at least 2 aligned observations");
+      }
+      if (tables) {
+        print_paired(options.values, options.values_y, options.precision,
+                     options.format);
       }
       specialized = true;
     }

@@ -486,6 +486,40 @@ StatsStatus stats_kde_grid(const double *values, size_t n, const double *xs,
 StatsStatus stats_normal_qq(const double *values, size_t n, double *sample_q,
                             double *theo_q);
 
+/**
+ * Two-sample Kolmogorov–Smirnov statistic.
+ *   D = max_t |F_x(t) − F_y(t)|
+ * evaluated at the pooled sample values, with the right-continuous ECDF
+ *   F(t) = #{v ≤ t} / n
+ * (same convention as stats_ecdf). Requires nx >= 1 and ny >= 1.
+ * Writes D in [0, 1] to *d.
+ *
+ * Returns STATS_ERR_NULL, STATS_ERR_EMPTY (nx == 0 or ny == 0), or
+ * STATS_ERR_ALLOCATION.
+ */
+StatsStatus stats_ks_2samp(const double *x, size_t nx, const double *y,
+                           size_t ny, double *d);
+
+/**
+ * Paired t-test on aligned observations: d_i = x_i − y_i,
+ *   t = mean(d) / (s_d / sqrt(n)),   df = n − 1
+ * where s_d is the sample standard deviation of d. Requires n >= 2.
+ * Writes t to *t_out and degrees of freedom to *df_out when non-NULL.
+ * If s_d == 0 and mean(d) == 0, t is 0; if s_d == 0 and mean(d) != 0,
+ * the statistic is undefined (STATS_ERR_INVALID).
+ *
+ * Returns STATS_ERR_NULL, STATS_ERR_EMPTY, or STATS_ERR_INVALID.
+ */
+StatsStatus stats_ttest_rel(const double *x, const double *y, size_t n,
+                            double *t_out, double *df_out);
+
+/**
+ * Normal density at x for N(mean, sd²):
+ *   φ((x − mean) / sd) / sd
+ * Returns 0 if sd <= 0.
+ */
+double stats_normal_pdf(double x, double mean, double sd);
+
 /** Sum of values; returns 0.0 if values is NULL. */
 double stats_sum(const double *values, size_t count);
 

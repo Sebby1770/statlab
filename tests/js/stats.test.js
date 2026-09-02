@@ -6,15 +6,18 @@ import {
   bootstrapMeanCi,
   ecdf,
   kde,
+  ks2samp,
   linreg,
   mannwhitney,
   mean,
   median,
+  normalPdf,
   normalQQ,
   pearson,
   spearman,
   stddev,
   summary,
+  ttestRel,
 } from "../../web/stats.js";
 
 /* Golden fixture from tests/reference_values_tests.cpp (published defs). */
@@ -107,4 +110,29 @@ test("spearman uses midranks on ties (C golden)", () => {
   const tx = [1, 2, 2, 3, 5, 5, 7];
   const ty = [10, 20, 20, 15, 15, 30, 25];
   assert.ok(Math.abs(spearman(tx, ty) - 0.5833333333) < 1e-9);
+});
+
+test("ks2samp matches C reference (ECDF with <= on pooled t)", () => {
+  assert.ok(Math.abs(ks2samp(kX, kY) - 0.1) < 1e-12);
+  assert.ok(Math.abs(ks2samp([1, 2, 3, 4, 5], [2, 4, 6, 8, 10]) - 0.6) < 1e-12);
+  assert.equal(ks2samp([1, 2, 3], [4, 5, 6]), 1);
+  assert.equal(ks2samp(kX, kX), 0);
+});
+
+test("ttestRel matches C reference", () => {
+  const rel = ttestRel(kX, kY);
+  assert.ok(Math.abs(rel.t - 0.2544566789) < 1e-9);
+  assert.equal(rel.df, 9);
+  const paired = ttestRel([1, 2, 3, 4, 5], [2, 4, 6, 8, 10]);
+  assert.ok(Math.abs(paired.t + 4.2426406871) < 1e-9);
+  assert.equal(paired.df, 4);
+  assert.equal(ttestRel(kX, kX).t, 0);
+});
+
+test("normalPdf matches C reference", () => {
+  assert.ok(Math.abs(normalPdf(0, 0, 1) - 0.3989422804) < 1e-9);
+  assert.ok(Math.abs(normalPdf(1, 0, 1) - 0.2419707245) < 1e-9);
+  assert.ok(Math.abs(normalPdf(5, 5, 2) - 0.1994711402) < 1e-9);
+  assert.equal(normalPdf(0, 0, 0), 0);
+  assert.equal(normalPdf(1, 0, -1), 0);
 });

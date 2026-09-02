@@ -3,6 +3,33 @@
 All notable changes to StatLab (formerly Hybrid Stats Lab) are documented
 in this file.
 
+## [2.2.0] — 2026-09-02
+
+### Added
+- `stats_ks_2samp` — two-sample Kolmogorov–Smirnov D = max_t |F_x(t) − F_y(t)|
+  over the pooled sample values, with F(t) = #{v ≤ t}/n (same ECDF as
+  `stats_ecdf`). Requires nx ≥ 1, ny ≥ 1.
+- `stats_ttest_rel` — paired *t*-test: d_i = x_i − y_i,
+  t = mean(d) / (s_d / √n), df = n−1. Requires n ≥ 2.
+- `stats_normal_pdf(x, mean, sd)` — N(mean, sd²) density; 0 if sd ≤ 0.
+- CLI: `--ks [file]` prints KS D vs a second sample (or `--column` /
+  `--column2`). `--paired` runs the paired *t*-test on two columns.
+- JS port: `ks2samp`, `ttestRel`, `normalPdf` with goldens matching the C
+  reference fixture.
+- **Web studio:** hover readout on histogram / KDE / ECDF / scatter;
+  N(mean, sample sd) overlay on the histogram (scaled to counts); residual
+  plot under scatter; bootstrap histogram of 800 resampled means (seed 1);
+  Drop outliers (Tukey) on a working copy of the primary series; Copy
+  markdown of the metric cards; Log10 toggle (skips non-positive values).
+  Night / day is unchanged.
+
+### Changed
+- Version **2.2.0**.
+
+### Compatibility
+- Existing `stats_*` entry points and `StatsSummary` field order are
+  unchanged. New APIs are additive. Previous CLI flags still work.
+
 ## [2.1.0] — 2026-09-02
 
 ### Added

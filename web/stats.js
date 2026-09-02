@@ -1,6 +1,7 @@
 /**
  * StatLab statistics module — ES port of the C17 core (descriptive,
- * bivariate, bootstrap, Mann–Whitney, KDE, normal Q–Q, ECDF, ACF).
+ * bivariate, bootstrap, Mann–Whitney, KDE, normal Q–Q, ECDF, ACF,
+ * two-sample KS, paired t, normal pdf).
  * Algorithms follow the published definitions documented in stats_core.h.
  */
 
@@ -286,13 +287,12 @@ function xorshift64Next(state) {
   return BigInt.asUintN(64, x);
 }
 
-export function bootstrapMeanCi(values, nboot = 2000, seed = 1n, conf = 0.95) {
+export function bootstrapMeans(values, nboot = 2000, seed = 1n) {
   const xs = finiteNumbers(values);
   const n = xs.length;
-  if (n === 0 || nboot < 1 || !(conf > 0 && conf < 1)) {
-    return { mean: NaN, lo: NaN, hi: NaN };
+  if (n === 0 || nboot < 1) {
+    return [];
   }
-  const sampleMean = mean(xs);
   let state = BigInt.asUintN(64, typeof seed === "bigint" ? seed : BigInt(seed));
   if (state === 0n) {
     state = 1n;
@@ -308,6 +308,17 @@ export function bootstrapMeanCi(values, nboot = 2000, seed = 1n, conf = 0.95) {
     }
     boot[b] = s / n;
   }
+  return boot;
+}
+
+export function bootstrapMeanCi(values, nboot = 2000, seed = 1n, conf = 0.95) {
+  const xs = finiteNumbers(values);
+  const n = xs.length;
+  if (n === 0 || nboot < 1 || !(conf > 0 && conf < 1)) {
+    return { mean: NaN, lo: NaN, hi: NaN };
+  }
+  const sampleMean = mean(xs);
+  const boot = bootstrapMeans(xs, nboot, seed);
   boot.sort((a, b) => a - b);
   const alpha = 0.5 * (1 - conf);
   return {
@@ -474,6 +485,70 @@ export function acf(values, lag) {
     numer += (xs[i] - m) * (xs[i + lag] - m);
   }
   return numer / denom;
+}
+
+/**
+ * Two-sample KS statistic: D = max_t |F_x(t) − F_y(t)| over pooled sample
+ * values, with F(t) = (count of values <= t) / n. Requires both n >= 1.
+ */
+export function ks2samp(x, y) {
+  const xs = finiteNumbers(x).slice().sort((a, b) => a - b);
+  const ys = finiteNumbers(y).slice().sort((a, b) => a - b);
+  const nx = xs.length;
+  const ny = ys.length;
+  if (nx < 1 || ny < 1) {
+    return NaN;
+  }
+  let i = 0;
+  let j = 0;
+  let best = 0;
+  while (i < nx || j < ny) {
+    const t = i < nx && (j >= ny || xs[i] <= ys[j]) ? xs[i] : ys[j];
+    while (i < nx && xs[i] <= t) {
+      i += 1;
+    }
+    while (j < ny && ys[j] <= t) {
+      j += 1;
+    }
+    const diff = Math.abs(i / nx - j / ny);
+    if (diff > best) {
+      best = diff;
+    }
+  }
+  return best;
+}
+
+/**
+ * Paired t-test: d_i = x_i − y_i, t = mean(d) / (s_d / sqrt(n)), df = n-1.
+ * s_d is the sample standard deviation of d. Requires n >= 2.
+ */
+export function ttestRel(x, y) {
+  const xs = finiteNumbers(x);
+  const ys = finiteNumbers(y);
+  const n = Math.min(xs.length, ys.length);
+  if (n < 2) {
+    return { t: NaN, df: NaN };
+  }
+  const d = new Array(n);
+  for (let i = 0; i < n; i++) {
+    d[i] = xs[i] - ys[i];
+  }
+  const m = mean(d);
+  const s = stddev(d, true);
+  const df = n - 1;
+  if (!(s > 0)) {
+    return { t: m === 0 ? 0 : NaN, df };
+  }
+  return { t: m / (s / Math.sqrt(n)), df };
+}
+
+/** Normal density at x for N(mean, sd²). Returns 0 if sd <= 0. */
+export function normalPdf(x, mean, sd) {
+  if (!(sd > 0)) {
+    return 0;
+  }
+  const z = (x - mean) / sd;
+  return (INV_SQRT_2PI / sd) * Math.exp(-0.5 * z * z);
 }
 
 /** ACF for lags 0..maxLag inclusive. Requires maxLag < n. */
