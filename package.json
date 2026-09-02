@@ -1,0 +1,10 @@
+{
+  "name": "statlab",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "StatLab 2.0 — C17 statistics engine, C++17 CLI, and web studio",
+  "scripts": {
+    "test": "node --test tests/js/*.test.js"
+  }
+}

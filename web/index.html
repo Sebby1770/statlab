@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StatLab — night desk</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <meta
+      name="description"
+      content="StatLab studio: load a CSV, inspect a numeric channel, and read the bench — histogram, KDE, box, Q-Q, scatter — all in the browser."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./studio.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#bench">Skip to bench</a>
+    <header class="mast">
+      <div>
+        <p class="desk-meta" style="text-align: left; margin: 0 0 0.4rem">
+          <strong>STATLAB 2.0</strong> night laboratory desk
+        </p>
+        <h1 class="wordmark">Stat<span>Lab</span></h1>
+        <p class="lede">
+          A local statistics bench. Drop a CSV on the blotter, pick a numeric
+          channel, and watch the phosphor traces — histogram, density, box,
+          Q–Q, and a two-channel scatter with the OLS line. Nothing leaves the
+          browser.
+        </p>
+      </div>
+      <p class="desk-meta">
+        <strong>DESK LIVE</strong>
+        Syne / Plex · copper on ink<br />
+        keys: S sample · E export
+      </p>
+    </header>
+
+    <main id="bench">
+      <div class="toolbar">
+        <section class="plate panel" aria-labelledby="load-heading">
+          <h2 id="load-heading">Load</h2>
+          <div class="row">
+            <label for="file">CSV file</label>
+            <input id="file" type="file" accept=".csv,text/csv,text/plain" />
+            <button type="button" class="primary" id="sample">
+              Load bench sample
+            </button>
+            <span class="file-name" id="file-name">phosphor bench sample</span>
+          </div>
+          <p class="note">
+            Numeric columns are detected automatically. Non-numeric cells are
+            skipped. First row is treated as a header unless every cell is a
+            number.
+          </p>
+        </section>
+
+        <section class="plate panel" aria-labelledby="channel-heading">
+          <h2 id="channel-heading">Channels</h2>
+          <div class="row">
+            <label for="col-a">Primary</label>
+            <select id="col-a"></select>
+            <label for="col-b">Second (optional)</label>
+            <select id="col-b"></select>
+          </div>
+          <div class="row" style="margin-top: 0.75rem">
+            <button type="button" class="phosphor" id="export-json">
+              Export JSON
+            </button>
+            <button type="button" class="ghost" id="export-html">
+              Printable snapshot
+            </button>
+          </div>
+          <p class="status" id="status" role="status"></p>
+        </section>
+      </div>
+
+      <section aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading" class="section-kicker">Instruments</h2>
+        <dl class="metrics" id="metrics"></dl>
+      </section>
+
+      <section class="charts" aria-label="Plots">
+        <figure class="plate" tabindex="0">
+          <figcaption><span>Histogram</span><span>counts</span></figcaption>
+          <canvas id="chart-hist" data-height="220" aria-label="Histogram of the primary channel"></canvas>
+        </figure>
+        <figure class="plate" tabindex="0">
+          <figcaption><span>KDE</span><span>Scott bandwidth</span></figcaption>
+          <canvas id="chart-kde" data-height="220" aria-label="Kernel density estimate"></canvas>
+        </figure>
+        <figure class="plate" tabindex="0">
+          <figcaption><span>Box</span><span>Tukey fences</span></figcaption>
+          <canvas id="chart-box" data-height="180" aria-label="Box plot"></canvas>
+        </figure>
+        <figure class="plate" tabindex="0">
+          <figcaption><span>Normal Q–Q</span><span>Blom positions</span></figcaption>
+          <canvas id="chart-qq" data-height="180" aria-label="Normal quantile-quantile plot"></canvas>
+        </figure>
+        <figure class="plate wide" tabindex="0">
+          <figcaption><span>Scatter + OLS</span><span>joint field</span></figcaption>
+          <canvas id="chart-scatter" data-height="280" aria-label="Scatter plot with ordinary least squares line"></canvas>
+        </figure>
+      </section>
+
+      <section class="compare" id="compare" aria-label="Two-channel comparison"></section>
+    </main>
+
+    <footer>
+      StatLab 2.0 — C17 engine, C++17 CLI, and this desk. MIT licensed.
+      Serve with <code>python3 -m http.server</code> from <code>web/</code>.
+    </footer>
+    <script type="module" src="./studio.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+build/
+build-debug/
+.cache/
+.DS_Store
+*.o
+*.a
+CMakeUserPresets.json
+compile_commands.json
+node_modules/
