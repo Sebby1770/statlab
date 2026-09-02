@@ -3,6 +3,30 @@
 All notable changes to StatLab (formerly Hybrid Stats Lab) are documented
 in this file.
 
+## [2.1.0] — 2026-09-02
+
+### Added
+- `stats_ecdf` — empirical CDF Fₙ(x) = (count of values ≤ x) / n. Does not
+  modify the input.
+- `stats_acf_series` — autocorrelation for lags 0..max_lag using the same
+  definition as `stats_acf` (lag 0 is 1 when variance > 0).
+- CLI: `--ecdf <x>` prints F(x). `--acf` without a lag prints lags
+  0..min(20, n−1) as CSV rows. `--acf N` still reports a single lag.
+- JS port: `ecdf`, `acf`, `acfSeries` with goldens matching the C reference
+  fixture.
+- **Web studio:** drag-and-drop CSV on the blotter, paste-numbers ingest,
+  column overview table, Tukey outlier list, ECDF step and ACF stem charts,
+  two-channel histogram overlay, Spearman ρ in the compare panel, daylight
+  toggle (`statlab-theme` in localStorage), last-CSV memory (~200k cap),
+  keyboard **D** for daylight.
+
+### Changed
+- Version **2.1.0**.
+
+### Compatibility
+- Existing `stats_*` entry points and `StatsSummary` field order are
+  unchanged. New APIs are additive. `--acf N` still works.
+
 ## [2.0.0] — 2026-09-02
 
 ### Changed

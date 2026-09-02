@@ -7,7 +7,7 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <meta
       name="description"
-      content="StatLab studio: load a CSV, inspect a numeric channel, and read the bench — histogram, KDE, box, Q-Q, scatter — all in the browser."
+      content="StatLab studio: drop a CSV, paste numbers, inspect every numeric channel, and read the bench — histogram, KDE, box, Q-Q, ECDF, ACF, scatter — all in the browser."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,26 +22,31 @@
     <header class="mast">
       <div>
         <p class="desk-meta" style="text-align: left; margin: 0 0 0.4rem">
-          <strong>STATLAB 2.0</strong> night laboratory desk
+          <strong>STATLAB 2.1</strong> laboratory desk
         </p>
         <h1 class="wordmark">Stat<span>Lab</span></h1>
         <p class="lede">
-          A local statistics bench. Drop a CSV on the blotter, pick a numeric
-          channel, and watch the phosphor traces — histogram, density, box,
-          Q–Q, and a two-channel scatter with the OLS line. Nothing leaves the
-          browser.
+          A local statistics instrument. Drop a CSV on the blotter, paste a
+          column of numbers, click a channel, and watch the traces —
+          histogram, density, box, Q–Q, ECDF, ACF, and a two-channel scatter
+          with the OLS line. Nothing leaves the browser.
         </p>
       </div>
-      <p class="desk-meta">
-        <strong>DESK LIVE</strong>
-        Syne / Plex · copper on ink<br />
-        keys: S sample · E export
-      </p>
+      <div class="mast-side">
+        <button type="button" class="ghost" id="theme-toggle" aria-pressed="false">
+          Daylight
+        </button>
+        <p class="desk-meta">
+          <strong>DESK LIVE</strong>
+          Syne / Plex · copper on ink<br />
+          keys: S sample · E export · D daylight
+        </p>
+      </div>
     </header>
 
     <main id="bench">
       <div class="toolbar">
-        <section class="plate panel" aria-labelledby="load-heading">
+        <section class="plate panel" aria-labelledby="load-heading" id="blotter">
           <h2 id="load-heading">Load</h2>
           <div class="row">
             <label for="file">CSV file</label>
@@ -50,6 +55,17 @@
               Load bench sample
             </button>
             <span class="file-name" id="file-name">phosphor bench sample</span>
+          </div>
+          <label for="paste">Paste numbers</label>
+          <textarea
+            id="paste"
+            rows="3"
+            spellcheck="false"
+            placeholder="4.2, 5.1  5.0  7.8 — commas, spaces, or newlines. CSV with headers is fine too."
+          ></textarea>
+          <div class="row" style="margin-top: 0.65rem">
+            <button type="button" class="ghost" id="ingest">Ingest paste</button>
+            <span class="note" style="margin: 0">Drop a CSV anywhere on this page.</span>
           </div>
           <p class="note">
             Numeric columns are detected automatically. Non-numeric cells are
@@ -78,9 +94,38 @@
         </section>
       </div>
 
+      <section class="plate panel" aria-labelledby="columns-heading">
+        <h2 id="columns-heading">Column overview</h2>
+        <div class="table-wrap">
+          <table class="columns" id="columns">
+            <thead>
+              <tr>
+                <th>column</th>
+                <th>n</th>
+                <th>mean</th>
+                <th>median</th>
+                <th>s</th>
+                <th>outliers</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="note">Click a row to park it on the primary channel.</p>
+      </section>
+
       <section aria-labelledby="metrics-heading">
         <h2 id="metrics-heading" class="section-kicker">Instruments</h2>
         <dl class="metrics" id="metrics"></dl>
+      </section>
+
+      <section class="plate panel outliers-panel" aria-labelledby="outliers-heading">
+        <h2 id="outliers-heading">Outliers</h2>
+        <p class="note" id="outlier-note">
+          Tukey fences · values strictly outside [Q1 − 1.5 IQR, Q3 + 1.5 IQR],
+          up to 20 shown.
+        </p>
+        <ol class="outlier-list" id="outliers"></ol>
       </section>
 
       <section class="charts" aria-label="Plots">
@@ -100,6 +145,14 @@
           <figcaption><span>Normal Q–Q</span><span>Blom positions</span></figcaption>
           <canvas id="chart-qq" data-height="180" aria-label="Normal quantile-quantile plot"></canvas>
         </figure>
+        <figure class="plate" tabindex="0">
+          <figcaption><span>ECDF</span><span>Fₙ(x)</span></figcaption>
+          <canvas id="chart-ecdf" data-height="220" aria-label="Empirical cumulative distribution"></canvas>
+        </figure>
+        <figure class="plate" tabindex="0">
+          <figcaption><span>ACF</span><span>lags 0–20</span></figcaption>
+          <canvas id="chart-acf" data-height="220" aria-label="Autocorrelation stem plot"></canvas>
+        </figure>
         <figure class="plate wide" tabindex="0">
           <figcaption><span>Scatter + OLS</span><span>joint field</span></figcaption>
           <canvas id="chart-scatter" data-height="280" aria-label="Scatter plot with ordinary least squares line"></canvas>
@@ -110,7 +163,7 @@
     </main>
 
     <footer>
-      StatLab 2.0 — C17 engine, C++17 CLI, and this desk. MIT licensed.
+      StatLab 2.1 — C17 engine, C++17 CLI, and this desk. MIT licensed.
       Serve with <code>python3 -m http.server</code> from <code>web/</code>.
     </footer>
     <script type="module" src="./studio.js"></script>

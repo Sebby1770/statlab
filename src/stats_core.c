@@ -1203,6 +1203,50 @@ StatsStatus stats_acf(const double *values, size_t n, size_t lag, double *out) {
   return STATS_OK;
 }
 
+StatsStatus stats_ecdf(const double *values, size_t n, double x, double *out) {
+  if (out == NULL || (values == NULL && n > 0)) {
+    return STATS_ERR_NULL;
+  }
+
+  if (n == 0) {
+    return STATS_ERR_EMPTY;
+  }
+
+  size_t count = 0;
+  for (size_t i = 0; i < n; ++i) {
+    if (values[i] <= x) {
+      ++count;
+    }
+  }
+
+  *out = (double)count / (double)n;
+  return STATS_OK;
+}
+
+StatsStatus stats_acf_series(const double *values, size_t n, size_t max_lag,
+                             double *out) {
+  if (out == NULL || (values == NULL && n > 0)) {
+    return STATS_ERR_NULL;
+  }
+
+  if (n == 0) {
+    return STATS_ERR_EMPTY;
+  }
+
+  if (max_lag >= n) {
+    return STATS_ERR_INVALID;
+  }
+
+  for (size_t lag = 0; lag <= max_lag; ++lag) {
+    const StatsStatus st = stats_acf(values, n, lag, &out[lag]);
+    if (st != STATS_OK) {
+      return st;
+    }
+  }
+
+  return STATS_OK;
+}
+
 StatsStatus stats_percentile_rank(const double *values, size_t n, double value,
                                   double *out) {
   if (out == NULL || (values == NULL && n > 0)) {

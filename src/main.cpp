@@ -64,7 +64,10 @@ struct CliOptions {
   bool entropy = false;
   size_t entropy_bins = 10;
   bool acf = false;
+  bool acf_lag_given = false;
   size_t acf_lag = 1;
+  bool ecdf = false;
+  double ecdf_x = 0.0;
   bool robust_z = false;
   bool nunique = false;
   bool jb = false;
@@ -107,6 +110,8 @@ void print_help() {
       << "  statlab --ci --geomean 1 2 3 4 5\n"
       << "  statlab --winsor 0.05 --entropy 8 --jb --nunique 1 2 3 4 5\n"
       << "  statlab --acf 1 1 2 3 2 1\n"
+      << "  statlab --acf --format csv 1 2 3 4 5 6\n"
+      << "  statlab --ecdf 4.5 1 2 3 4 5 6 7 8 9\n"
       << "  statlab --robust-z 1 2 3 4 5 100\n"
       << "  statlab --trim 0.1 --file data.csv\n"
       << "  statlab --outliers --boxplot 1 2 3 4 5 100\n"
@@ -144,7 +149,9 @@ void print_help() {
          "0–0.5); report winsorized mean\n"
       << "      --entropy [bins]   Shannon entropy of histogram (default "
          "bins: 10)\n"
-      << "      --acf [lag]        Autocorrelation at lag (default: 1)\n"
+      << "      --acf [lag]        Autocorrelation at integer lag; omit lag "
+         "to print lags 0..min(20, n-1) as CSV rows\n"
+      << "      --ecdf <x>          Empirical CDF F(x) = (# values <= x) / n\n"
       << "      --robust-z         Print robust (MAD-scaled) z-score series\n"
       << "      --nunique          Include unique-value count in the report\n"
       << "      --jb               Include Jarque–Bera statistic in the report\n"
@@ -653,6 +660,7 @@ CliOptions parse_args(int argc, char **argv) {
     if (arg == "--acf") {
       options.acf = true;
       options.acf_lag = 1;
+      options.acf_lag_given = false;
       if (i + 1 < argc && !looks_like_option(argv[i + 1])) {
         const std::string maybe = argv[i + 1];
         char *end = nullptr;
@@ -662,9 +670,19 @@ CliOptions parse_args(int argc, char **argv) {
             n <= static_cast<long>(std::numeric_limits<int>::max()) &&
             maybe.find('.') == std::string::npos) {
           options.acf_lag = static_cast<size_t>(n);
+          options.acf_lag_given = true;
           ++i;
         }
       }
+      continue;
+    }
+
+    if (arg == "--ecdf") {
+      if (i + 1 >= argc) {
+        throw std::runtime_error("--ecdf requires a value x");
+      }
+      options.ecdf_x = parse_number(argv[++i], "--ecdf");
+      options.ecdf = true;
       continue;
     }
 
@@ -918,6 +936,9 @@ struct ExtraSummary {
   bool use_acf = false;
   double acf = 0.0;
   size_t acf_lag = 1;
+  bool use_ecdf = false;
+  double ecdf = 0.0;
+  double ecdf_x = 0.0;
   bool use_nunique = false;
   size_t nunique = 0;
   bool use_jb = false;
@@ -1003,6 +1024,10 @@ void print_text(const StatsSummary &summary, int precision,
   if (extra.use_acf) {
     line("acf", extra.acf);
   }
+  if (extra.use_ecdf) {
+    line("ecdf_x", extra.ecdf_x);
+    line("ecdf", extra.ecdf);
+  }
   if (extra.use_jb) {
     line("jarque_bera", extra.jarque_bera);
     line("jarque_bera_p", extra.jarque_bera_p);
@@ -1079,16 +1104,23 @@ void print_json(const StatsSummary &summary, int precision,
   field("sample_stddev", summary.sample_stddev);
   field("skewness", summary.skewness);
   field("kurtosis", summary.kurtosis);
-  const bool more = extra.use_entropy || extra.use_acf || extra.use_jb ||
-                    extra.use_rms || extra.use_argmin || extra.use_argmax;
+  const bool more = extra.use_entropy || extra.use_acf || extra.use_ecdf ||
+                    extra.use_jb || extra.use_rms || extra.use_argmin ||
+                    extra.use_argmax;
   field("cv", summary.cv, !more);
   if (extra.use_entropy) {
-    const bool last = !extra.use_acf && !extra.use_jb && !extra.use_rms &&
-                      !extra.use_argmin && !extra.use_argmax;
+    const bool last = !extra.use_acf && !extra.use_ecdf && !extra.use_jb &&
+                      !extra.use_rms && !extra.use_argmin && !extra.use_argmax;
     field("entropy", extra.entropy, last);
   }
   if (extra.use_acf) {
     field("acf", extra.acf,
+          !extra.use_ecdf && !extra.use_jb && !extra.use_rms &&
+              !extra.use_argmin && !extra.use_argmax);
+  }
+  if (extra.use_ecdf) {
+    field("ecdf_x", extra.ecdf_x);
+    field("ecdf", extra.ecdf,
           !extra.use_jb && !extra.use_rms && !extra.use_argmin &&
               !extra.use_argmax);
   }
@@ -1172,6 +1204,10 @@ void print_csv(const StatsSummary &summary, int precision,
   }
   if (extra.use_acf) {
     row("acf", extra.acf);
+  }
+  if (extra.use_ecdf) {
+    row("ecdf_x", extra.ecdf_x);
+    row("ecdf", extra.ecdf);
   }
   if (extra.use_jb) {
     row("jarque_bera", extra.jarque_bera);
@@ -1462,6 +1498,30 @@ void print_covariance(double cov, size_t n, bool sample, int precision,
             << std::right;
   print_number(std::cout, cov, precision);
   std::cout << '\n';
+}
+
+void print_acf_series(const std::vector<double> &series, int precision,
+                      OutputFormat format) {
+  if (format == OutputFormat::Json) {
+    std::cout << "{\n  \"n\": " << series.size() << ",\n  \"values\": [\n";
+    for (size_t i = 0; i < series.size(); ++i) {
+      std::cout << "    {\"lag\": " << i << ", \"acf\": ";
+      print_json_number(std::cout, series[i], precision);
+      std::cout << "}";
+      if (i + 1 != series.size()) {
+        std::cout << ',';
+      }
+      std::cout << '\n';
+    }
+    std::cout << "  ]\n}\n";
+    return;
+  }
+  std::cout << "lag,acf\n";
+  for (size_t i = 0; i < series.size(); ++i) {
+    std::cout << i << ',';
+    print_number(std::cout, series[i], precision);
+    std::cout << '\n';
+  }
 }
 
 void print_series(const char *title, const char *value_name,
@@ -2146,6 +2206,23 @@ int main(int argc, char **argv) {
       return 0;
     }
 
+    if (options.acf && !options.acf_lag_given) {
+      if (options.values.empty()) {
+        throw std::runtime_error("No numeric values were provided.");
+      }
+      const size_t n = options.values.size();
+      const size_t max_lag = n > 1 ? (n - 1 < 20 ? n - 1 : 20) : 0;
+      std::vector<double> series(max_lag + 1);
+      const StatsStatus st =
+          stats_acf_series(options.values.data(), n, max_lag, series.data());
+      if (st != STATS_OK) {
+        throw std::runtime_error(std::string("ACF failed: ") +
+                                 stats_status_message(st));
+      }
+      print_acf_series(series, options.precision, options.format);
+      return 0;
+    }
+
     const bool html_out =
         options.write_html || options.format == OutputFormat::Html;
 
@@ -2274,7 +2351,7 @@ int main(int argc, char **argv) {
     /* --outliers as primary specialized report (still allows boxplot). */
     if (options.outliers && !options.use_trim && !options.ci &&
         !options.geomean && !options.winsor && !options.entropy &&
-        !options.acf && !options.nunique && !options.jb &&
+        !options.acf && !options.ecdf && !options.nunique && !options.jb &&
         options.format != OutputFormat::Text) {
       const StatsSummary summary = require_summary(options.values, nullptr);
       print_outliers(options.values, summary, options.precision, options.format);
@@ -2353,7 +2430,7 @@ int main(int argc, char **argv) {
       extra.use_entropy = true;
     }
 
-    if (options.acf) {
+    if (options.acf && options.acf_lag_given) {
       if (options.acf_lag >= options.values.size()) {
         throw std::runtime_error("--acf lag must be < number of values");
       }
@@ -2366,6 +2443,18 @@ int main(int argc, char **argv) {
       }
       extra.use_acf = true;
       extra.acf_lag = options.acf_lag;
+    }
+
+    if (options.ecdf) {
+      const StatsStatus st =
+          stats_ecdf(options.values.data(), options.values.size(),
+                     options.ecdf_x, &extra.ecdf);
+      if (st != STATS_OK) {
+        throw std::runtime_error(std::string("ECDF failed: ") +
+                                 stats_status_message(st));
+      }
+      extra.use_ecdf = true;
+      extra.ecdf_x = options.ecdf_x;
     }
 
     if (options.nunique) {

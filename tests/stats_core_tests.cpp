@@ -627,6 +627,61 @@ int main() {
     CHECK(stats_acf(constant, 3, 1, &acf) == STATS_ERR_INVALID);
   }
 
+  /* ---------- v2.1: ACF series ---------- */
+  {
+    const double data[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    double series[5];
+    CHECK(stats_acf_series(data, 5, 2, series) == STATS_OK);
+    CHECK(close_to(series[0], 1.0));
+    CHECK(close_to(series[1], 0.4));
+    /* lag 2: numer = (-2)*0 + (-1)*1 + 0*2 = -1, denom = 10 → -0.1 */
+    CHECK(close_to(series[2], -0.1));
+
+    double single = 0.0;
+    for (size_t lag = 0; lag <= 4; ++lag) {
+      CHECK(stats_acf(data, 5, lag, &single) == STATS_OK);
+      CHECK(stats_acf_series(data, 5, lag, series) == STATS_OK);
+      CHECK(close_to(series[lag], single));
+    }
+
+    CHECK(stats_acf_series(nullptr, 5, 1, series) == STATS_ERR_NULL);
+    CHECK(stats_acf_series(data, 5, 1, nullptr) == STATS_ERR_NULL);
+    CHECK(stats_acf_series(data, 0, 0, series) == STATS_ERR_EMPTY);
+    CHECK(stats_acf_series(data, 5, 5, series) == STATS_ERR_INVALID);
+
+    const double constant[] = {2.0, 2.0, 2.0};
+    CHECK(stats_acf_series(constant, 3, 0, series) == STATS_OK);
+    CHECK(close_to(series[0], 1.0));
+    CHECK(stats_acf_series(constant, 3, 1, series) == STATS_ERR_INVALID);
+  }
+
+  /* ---------- v2.1: ECDF ---------- */
+  {
+    const double data[] = {5.0, 1.0, 3.0, 2.0, 4.0};
+    const double orig[] = {5.0, 1.0, 3.0, 2.0, 4.0};
+    double f = 0.0;
+    /* Unsorted input: F(3) = 3/5, and the array is left untouched. */
+    CHECK(stats_ecdf(data, 5, 3.0, &f) == STATS_OK);
+    CHECK(close_to(f, 0.6));
+    CHECK(data[0] == orig[0] && data[1] == orig[1] && data[2] == orig[2] &&
+          data[3] == orig[3] && data[4] == orig[4]);
+
+    CHECK(stats_ecdf(data, 5, 0.0, &f) == STATS_OK);
+    CHECK(close_to(f, 0.0));
+    CHECK(stats_ecdf(data, 5, 5.0, &f) == STATS_OK);
+    CHECK(close_to(f, 1.0));
+    CHECK(stats_ecdf(data, 5, 2.5, &f) == STATS_OK);
+    CHECK(close_to(f, 0.4));
+
+    const double tied[] = {1.0, 2.0, 2.0, 2.0, 5.0};
+    CHECK(stats_ecdf(tied, 5, 2.0, &f) == STATS_OK);
+    CHECK(close_to(f, 0.8));
+
+    CHECK(stats_ecdf(nullptr, 5, 1.0, &f) == STATS_ERR_NULL);
+    CHECK(stats_ecdf(data, 5, 1.0, nullptr) == STATS_ERR_NULL);
+    CHECK(stats_ecdf(data, 0, 1.0, &f) == STATS_ERR_EMPTY);
+  }
+
   /* ---------- v1.5: percentile rank ---------- */
   {
     const double data[] = {1.0, 2.0, 3.0, 4.0, 5.0};

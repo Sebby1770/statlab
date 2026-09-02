@@ -1,6 +1,6 @@
 /**
  * StatLab statistics module — ES port of the C17 core (descriptive,
- * bivariate, bootstrap, Mann–Whitney, KDE, normal Q–Q).
+ * bivariate, bootstrap, Mann–Whitney, KDE, normal Q–Q, ECDF, ACF).
  * Algorithms follow the published definitions documented in stats_core.h.
  */
 
@@ -428,6 +428,66 @@ export function normalQQ(values) {
     theo[i] = Math.sqrt(2) * erfinv(2 * p - 1);
   }
   return { sample, theo };
+}
+
+/** Empirical CDF: F_n(x) = (count of values <= x) / n. */
+export function ecdf(values, x) {
+  const xs = finiteNumbers(values);
+  const n = xs.length;
+  if (n === 0) {
+    return NaN;
+  }
+  let count = 0;
+  for (const v of xs) {
+    if (v <= x) {
+      count += 1;
+    }
+  }
+  return count / n;
+}
+
+/**
+ * Pearson autocorrelation at integer lag, matching stats_acf:
+ * sum_{t} (x_t-m)(x_{t+lag}-m) / sum (x_t-m)^2 with m = full-series mean.
+ * lag 0 is 1 when variance > 0 (or when variance is 0).
+ */
+export function acf(values, lag) {
+  const xs = finiteNumbers(values);
+  const n = xs.length;
+  if (n === 0 || lag < 0 || lag >= n) {
+    return NaN;
+  }
+  const m = mean(xs);
+  let denom = 0;
+  for (const v of xs) {
+    const d = v - m;
+    denom += d * d;
+  }
+  if (denom <= 0) {
+    return lag === 0 ? 1 : NaN;
+  }
+  if (lag === 0) {
+    return 1;
+  }
+  let numer = 0;
+  for (let i = 0; i + lag < n; i++) {
+    numer += (xs[i] - m) * (xs[i + lag] - m);
+  }
+  return numer / denom;
+}
+
+/** ACF for lags 0..maxLag inclusive. Requires maxLag < n. */
+export function acfSeries(values, maxLag) {
+  const xs = finiteNumbers(values);
+  const n = xs.length;
+  if (n === 0 || maxLag < 0 || maxLag >= n) {
+    return [];
+  }
+  const out = new Array(maxLag + 1);
+  for (let lag = 0; lag <= maxLag; lag++) {
+    out[lag] = acf(xs, lag);
+  }
+  return out;
 }
 
 export function histogram(values, bins = 10) {

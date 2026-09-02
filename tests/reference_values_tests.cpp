@@ -119,6 +119,23 @@ int main() {
         stats_acf(kX, kN, 2, &a);
         expect_near("acf_lag2", a, 0.2259136213, 1e-9);
 
+        /* ECDF: F_n(x) = (# of sample points <= x) / n. kX has 5 values <= 7
+           and 3 values <= 4. */
+        stats_ecdf(kX, kN, 7.0, &a);
+        expect_near("ecdf(7)", a, 0.5, 1e-12);
+        stats_ecdf(kX, kN, 4.0, &a);
+        expect_near("ecdf(4)", a, 0.3, 1e-12);
+        stats_ecdf(kX, kN, 1.0, &a);
+        expect_near("ecdf(1)", a, 0.0, 1e-12);
+        stats_ecdf(kX, kN, 40.0, &a);
+        expect_near("ecdf(40)", a, 1.0, 1e-12);
+
+        /* ACF series must match the single-lag definition at each lag. */
+        stats_acf_series(kX, kN, 2, out);
+        expect_near("acf_series_lag0", out[0], 1.0, 1e-12);
+        expect_near("acf_series_lag1", out[1], 0.4651162791, 1e-9);
+        expect_near("acf_series_lag2", out[2], 0.2259136213, 1e-9);
+
         /* EMA seeds with the first observation. */
         stats_ema(kX, kN, 0.5, out);
         expect_near("ema_alpha0.5_last", out[kN - 1], 28.58203125, 1e-10);

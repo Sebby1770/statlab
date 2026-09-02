@@ -13,9 +13,30 @@
   --danger: #d46a4a;
   --rule: rgba(47, 111, 106, 0.22);
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --plot: #0b0d0c;
   --font-display: "Syne", ui-sans-serif, sans-serif;
   --font-ui: "IBM Plex Sans", ui-sans-serif, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+html[data-theme="day"] {
+  --ink: #e7e1d4;
+  --ink-2: #f3eee4;
+  --ink-3: #cfc6b4;
+  --paper: #161410;
+  --paper-dim: #4a453c;
+  --copper: #a56a2c;
+  --copper-2: #8a5724;
+  --teal: #2f6f6a;
+  --teal-2: #245753;
+  --phosphor: #1f4a46;
+  --phosphor-dim: #2f6f6a;
+  --danger: #a63b28;
+  --rule: rgba(47, 111, 106, 0.18);
+  --shadow: 0 16px 32px rgba(40, 32, 18, 0.12);
+  --plot: #d8d1c3;
+  color-scheme: light;
 }
 
 *,
@@ -74,6 +95,40 @@ body {
   max-width: 1280px;
   margin: 0 auto;
   border-bottom: 1px solid var(--ink-3);
+}
+
+.mast-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+html[data-theme="day"] .wordmark span {
+  text-shadow: none;
+  color: var(--teal);
+}
+
+html[data-theme="day"] body {
+  background:
+    linear-gradient(180deg, rgba(231, 225, 212, 0.2), rgba(231, 225, 212, 0.55)),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 31px,
+      var(--rule) 31px 32px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 31px,
+      var(--rule) 31px 32px
+    ),
+    var(--ink);
+}
+
+html[data-theme="day"] button.phosphor {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #f3eee4;
 }
 
 .wordmark {
@@ -196,13 +251,25 @@ button {
 }
 
 select,
-button {
+button,
+textarea {
   background: var(--ink);
   color: var(--paper);
   border: 1px solid var(--teal);
   border-radius: 0;
   padding: 0.45rem 0.7rem;
   min-height: 2.4rem;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 5.6rem;
+  margin-top: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  resize: vertical;
 }
 
 select:focus,
@@ -240,6 +307,11 @@ button.phosphor {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--copper-2);
+}
+
+.panel label[for="paste"] {
+  display: block;
+  margin-top: 0.9rem;
 }
 
 .section-kicker {
@@ -317,8 +389,112 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  background: #0b0d0c;
+  background: var(--plot);
   border: 1px solid var(--ink-3);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table.columns {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+table.columns th {
+  text-align: left;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--teal-2);
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--ink-3);
+}
+
+table.columns td {
+  padding: 0.5rem 0.55rem;
+  border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+
+table.columns td:first-child {
+  color: var(--copper-2);
+}
+
+table.columns tbody tr {
+  cursor: pointer;
+}
+
+table.columns tbody tr:hover {
+  background: rgba(47, 111, 106, 0.12);
+}
+
+table.columns tbody tr.selected {
+  background: rgba(198, 243, 90, 0.08);
+  box-shadow: inset 3px 0 0 var(--phosphor);
+}
+
+html[data-theme="day"] table.columns tbody tr.selected {
+  background: rgba(47, 111, 106, 0.12);
+  box-shadow: inset 3px 0 0 var(--teal);
+}
+
+.outlier-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.55rem 0 0;
+}
+
+.outlier-list li {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--danger);
+  color: var(--copper-2);
+}
+
+.outlier-list .empty {
+  border-color: var(--teal);
+  color: var(--paper-dim);
+}
+
+body.is-drop #bench {
+  outline: 2px dashed var(--phosphor);
+  outline-offset: 8px;
+  background: rgba(198, 243, 90, 0.05);
+}
+
+body.is-drop::before {
+  content: "Drop CSV on the blotter";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: clamp(1.3rem, 4vw, 2.3rem);
+  color: var(--phosphor);
+  background: rgba(14, 17, 16, 0.48);
+  z-index: 30;
+}
+
+html[data-theme="day"] body.is-drop #bench {
+  background: rgba(47, 111, 106, 0.08);
+}
+
+html[data-theme="day"] body.is-drop::before {
+  background: rgba(231, 225, 212, 0.62);
+  color: var(--teal);
 }
 
 .wide {
@@ -373,6 +549,10 @@ footer a {
 
   .mast {
     grid-template-columns: 1fr;
+  }
+
+  .mast-side {
+    align-items: flex-start;
   }
 
   .desk-meta {

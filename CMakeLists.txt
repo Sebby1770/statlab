@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(
   statlab
-  VERSION 2.0.0
+  VERSION 2.1.0
   DESCRIPTION "StatLab: a C17 statistics engine with a C++17 CLI and web studio"
   LANGUAGES C CXX
 )
@@ -77,6 +77,8 @@ add_test(NAME cli_geomean COMMAND statlab --geomean --format csv --precision 4 1
 add_test(NAME cli_winsor COMMAND statlab --winsor 0.1 --format csv --precision 4 1 2 3 4 5 6 7 8 9 100)
 add_test(NAME cli_entropy COMMAND statlab --entropy 4 --format csv --precision 4 1 1 2 2)
 add_test(NAME cli_acf COMMAND statlab --acf 1 --format csv --precision 4 1 2 3 4 5)
+add_test(NAME cli_acf_series COMMAND statlab --acf --format csv --precision 4 1 2 3 4 5)
+add_test(NAME cli_ecdf COMMAND statlab --ecdf 3 --format csv --precision 4 1 2 3 4 5)
 add_test(NAME cli_robust_z COMMAND statlab --robust-z --format csv --precision 4 1 2 3 4 5)
 add_test(NAME cli_nunique COMMAND statlab --nunique --format csv --precision 4 1 2 2 3 1)
 add_test(NAME cli_jb COMMAND statlab --jb --format csv --precision 4 2 4 4 4 5 5 7 9)
@@ -104,6 +106,9 @@ set_tests_properties(cli_geomean PROPERTIES PASS_REGULAR_EXPRESSION "geometric_m
 set_tests_properties(cli_winsor PROPERTIES PASS_REGULAR_EXPRESSION "winsorized_mean,")
 set_tests_properties(cli_entropy PROPERTIES PASS_REGULAR_EXPRESSION "entropy,")
 set_tests_properties(cli_acf PROPERTIES PASS_REGULAR_EXPRESSION "acf,0\\.4000")
+set_tests_properties(cli_acf_series PROPERTIES PASS_REGULAR_EXPRESSION
+                     "lag,acf")
+set_tests_properties(cli_ecdf PROPERTIES PASS_REGULAR_EXPRESSION "ecdf,0\\.6000")
 set_tests_properties(cli_robust_z PROPERTIES PASS_REGULAR_EXPRESSION "index,robust_z")
 set_tests_properties(cli_nunique PROPERTIES PASS_REGULAR_EXPRESSION "nunique,3")
 set_tests_properties(cli_jb PROPERTIES PASS_REGULAR_EXPRESSION "jarque_bera,")

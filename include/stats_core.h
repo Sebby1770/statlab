@@ -308,6 +308,26 @@ StatsStatus stats_nunique(const double *values, size_t n, size_t *out);
 StatsStatus stats_acf(const double *values, size_t n, size_t lag, double *out);
 
 /**
+ * Empirical CDF at x: F_n(x) = (count of values <= x) / n.
+ * Does not modify the input array. Does not require the sample to be sorted.
+ *
+ * Returns STATS_ERR_NULL, STATS_ERR_EMPTY.
+ */
+StatsStatus stats_ecdf(const double *values, size_t n, double x, double *out);
+
+/**
+ * Autocorrelation series for lags 0..max_lag (inclusive).
+ * Writes max_lag+1 values to out using the same definition as stats_acf.
+ * Requires max_lag < n. lag 0 is 1 when variance > 0 (and when variance is
+ * 0). Zero variance with max_lag > 0 → STATS_ERR_INVALID after writing
+ * out[0] = 1.
+ *
+ * Returns STATS_ERR_NULL, STATS_ERR_EMPTY, or STATS_ERR_INVALID.
+ */
+StatsStatus stats_acf_series(const double *values, size_t n, size_t max_lag,
+                             double *out);
+
+/**
  * Percentile rank of `value` in the sample, in [0, 1]:
  *   (count(x < value) + 0.5 * count(x == value)) / n
  * Uses exact floating equality for ties.
